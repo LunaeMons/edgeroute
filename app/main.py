@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import db
+from app.cdns.router import router as cdn_router
 
 
 @asynccontextmanager
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
         The configured application.
     """
     app = FastAPI(title="EdgeRoute", version="0.0.1", lifespan=lifespan)
+    app.include_router(cdn_router)
 
     @app.get("/healthz", tags=["ops"])
     def healthz() -> dict[str, str]:

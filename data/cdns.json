@@ -1,0 +1,6 @@
+[
+  {"name": "aurora", "base_url": "https://nw.aurora-edge.example", "weight": 50, "enabled": true, "cost_per_gb_cents": 4},
+  {"name": "meridian", "base_url": "https://media.meridiancdn.example", "weight": 30, "enabled": true, "cost_per_gb_cents": 3},
+  {"name": "kestrel", "base_url": "https://northwind.kestrel.example", "weight": 20, "enabled": true, "cost_per_gb_cents": 2},
+  {"name": "legacy-cdn", "base_url": "http://origin-old.northwind.example", "weight": 10, "enabled": false, "cost_per_gb_cents": 9}
+]
