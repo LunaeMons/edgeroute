@@ -1,0 +1,14 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: commit-msg-format
+        name: Commit message format (NWM ticket + conventional type)
+        entry: scripts/check-commit-msg.sh
+        language: script
+        stages: [commit-msg]
