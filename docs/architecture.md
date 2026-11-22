@@ -1,6 +1,7 @@
 # Architecture (current state)
 
-EdgeRoute is a single FastAPI service with a SQLite database.
+EdgeRoute is a single FastAPI service with a SQLite database, accessed through the SQLAlchemy
+ORM, with the schema managed by Alembic migrations (ADR 0002).
 
 ```mermaid
 flowchart LR
@@ -17,16 +18,23 @@ flowchart LR
 |---|---|
 | `app/main.py` | Application factory, router wiring, `/healthz` |
 | `app/config.py` | Settings from environment variables |
-| `app/db.py` | SQLite connection and schema |
+| `app/db.py` | SQLAlchemy engine, per-request sessions, running migrations |
+| `migrations/` | Alembic migrations: every schema change, in order |
 | `app/auth.py` | Admin token check for write endpoints |
 | `app/cdns/` | CRUD for CDN providers (name, base URL, weight, enabled, cost) |
 | `app/steering/` | Picks a CDN for a viewer by weighted random choice |
 | `app/probes/` | Imports probe exports, computes health statistics per CDN and region |
 
+Each feature folder follows the same layout: `router.py` (HTTP endpoints), `schemas.py` (the API
+contract, pydantic), `models.py` (database tables, SQLAlchemy), and `repository.py` or
+`service.py` (database access and logic).
+
 ## Data model
 
-- `cdn`: one row per provider. `weight` is its share of traffic relative to the others.
-- `probe`: one row per probe measurement (time, provider, region, status, TTFB in ms).
+- `cdn` (`app/cdns/models.py`): one row per provider. `weight` is its share of traffic relative to
+  the others.
+- `probe` (`app/probes/models.py`): one row per probe measurement (time, provider, region, status,
+  TTFB in ms).
 
 ## Known gaps
 

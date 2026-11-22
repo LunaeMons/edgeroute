@@ -77,6 +77,28 @@ def provider_health(conn: sqlite3.Connection, region: str, window: int) -> dict[
 FastAPI shows an endpoint's docstring as its description at `/docs`, so write endpoint docstrings
 for the people who call the API too.
 
+## Database changes
+
+The database is accessed through SQLAlchemy models (`app/<feature>/models.py`), and the schema is
+changed only through Alembic migrations (`migrations/versions/`). See ADR 0002.
+
+- Never write SQL by formatting strings. Build queries with SQLAlchemy (`select(Cdn).where(...)`),
+  which sends values as parameters.
+- To change the schema: edit the model, then generate a migration and **read it**. Autogenerate
+  is a draft, not a decision:
+
+  ```bash
+  uv run alembic revision --autogenerate --rev-id 0002 -m "add probe_id to probe"
+  make migrate
+  ```
+
+- Check that `downgrade()` really undoes `upgrade()`. The test suite runs every migration down and
+  up again, and fails if the models and the migrations disagree.
+- Think about existing data. A new `NOT NULL` column needs a default or a backfill, and a new
+  `UNIQUE` constraint fails if duplicates already exist.
+- Never edit a migration that has been merged to `main`. Other environments have already run it.
+  Write a new one.
+
 ## Tests
 
 Every change comes with tests, written to the same standard as the existing suite in `tests/`.
