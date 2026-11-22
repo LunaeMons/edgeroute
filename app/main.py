@@ -18,7 +18,7 @@ from app.steering.router import router as steering_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Prepare the database before the app starts serving requests.
+    """Prepare the database at start-up and release its connections at shutdown.
 
     FastAPI runs the code before ``yield`` at start-up and the code after it at
     shutdown.
@@ -29,8 +29,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     Yields:
         Control back to FastAPI while the app runs.
     """
-    db.init_db()
+    # Apply any pending schema migrations before serving the first request.
+    db.migrate()
     yield
+    db.dispose_engines()
 
 
 def create_app() -> FastAPI:

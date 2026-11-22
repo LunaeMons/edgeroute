@@ -48,8 +48,9 @@ def test_create_returns_the_stored_cdn(client: TestClient, admin_headers: dict[s
         "enabled": False,
         "cost_per_gb_cents": 4,
     }
-    # The database fills in the creation time; check its format rather than its value.
-    datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+    # The database fills in the creation time; check it is a valid ISO 8601 timestamp
+    # rather than its exact value, which depends on when the test runs.
+    datetime.fromisoformat(created_at)
 
 
 def test_create_applies_the_defaults(client: TestClient, admin_headers: dict[str, str]) -> None:

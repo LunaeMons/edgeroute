@@ -186,7 +186,7 @@ def test_choice_is_weighted_by_the_configured_weights(
         Returns:
             A list holding the last candidate.
         """
-        calls.append({"names": [c["name"] for c in population], "weights": list(weights), "k": k})
+        calls.append({"names": [c.name for c in population], "weights": list(weights), "k": k})
         return [population[-1]]
 
     monkeypatch.setattr(service.random, "choices", fake_choices)

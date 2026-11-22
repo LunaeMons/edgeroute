@@ -5,7 +5,9 @@ validate incoming JSON (an invalid body gets a 422 response with the reason), to
 outgoing JSON, and to generate the OpenAPI document served at ``/docs``.
 """
 
-from pydantic import BaseModel, Field, HttpUrl
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class CdnCreate(BaseModel):
@@ -47,8 +49,11 @@ class CdnUpdate(BaseModel):
     cost_per_gb_cents: int | None = Field(default=None, ge=0)
 
 
-class Cdn(BaseModel):
-    """A CDN provider as stored and returned by the API.
+class CdnRead(BaseModel):
+    """A CDN provider as returned by the API.
+
+    ``from_attributes=True`` lets FastAPI build this response directly from a database
+    model object (:class:`app.cdns.models.Cdn`), reading its attributes.
 
     Attributes:
         id: Database identifier.
@@ -57,8 +62,10 @@ class Cdn(BaseModel):
         weight: Relative share of traffic, from 0 to 100.
         enabled: Whether the CDN may receive traffic.
         cost_per_gb_cents: Price per gigabyte in cents, or None if unknown.
-        created_at: When the provider was registered (UTC, ``YYYY-MM-DD HH:MM:SS``).
+        created_at: When the provider was registered (UTC).
     """
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
@@ -66,4 +73,4 @@ class Cdn(BaseModel):
     weight: int
     enabled: bool
     cost_per_gb_cents: int | None
-    created_at: str
+    created_at: datetime

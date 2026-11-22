@@ -6,41 +6,42 @@ the eligible CDNs in proportion to their weights.
 """
 
 import random
-import sqlite3
-from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.cdns.models import Cdn
 
 
-def eligible_cdns(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+def eligible_cdns(session: Session) -> list[Cdn]:
     """Return the CDN providers that may receive traffic.
 
     Args:
-        conn: Open database connection.
+        session: Open database session.
 
     Returns:
         Enabled providers with a positive weight.
     """
-    rows = conn.execute("SELECT id, name, base_url, weight, enabled FROM cdn").fetchall()
+    cdns = session.scalars(select(Cdn).order_by(Cdn.id))
     # Keep the providers that are switched on and have a share of the traffic.
-    return [dict(row) for row in rows if row["enabled"] and row["weight"] > 0]
+    return [cdn for cdn in cdns if cdn.enabled and cdn.weight > 0]
 
 
-def choose_cdn(
-    conn: sqlite3.Connection, region: str, session_id: str | None = None
-) -> dict[str, Any] | None:
+def choose_cdn(session: Session, region: str, session_id: str | None = None) -> Cdn | None:
     """Pick a CDN for a viewer using the configured weights.
 
     Args:
-        conn: Open database connection.
+        session: Open database session.
         region: The viewer's region, e.g. ``"eu-west"``.
         session_id: The player session, if known.
 
     Returns:
         The chosen provider, or None if no provider is eligible.
     """
-    candidates = eligible_cdns(conn)
+    candidates = eligible_cdns(session)
     if not candidates:
         return None
-    weights = [cdn["weight"] for cdn in candidates]
+    weights = [cdn.weight for cdn in candidates]
     # ``random.choices`` picks one candidate, each with a probability proportional to
     # its weight: with weights 50, 30 and 20, the first is picked about half the time.
     # The linter flags ``random`` as unsuitable for security (S311); this is load

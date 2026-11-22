@@ -8,9 +8,13 @@ recent probes:
   slowest viewers experience, which an average hides.
 """
 
-import sqlite3
 import statistics
 from typing import Any
+
+from sqlalchemy import Row, select
+from sqlalchemy.orm import Session
+
+from app.probes.models import Probe
 
 
 def _p95(values: list[float]) -> float:
@@ -25,14 +29,14 @@ def _p95(values: list[float]) -> float:
     return statistics.median(values)
 
 
-def provider_health(conn: sqlite3.Connection, region: str, window: int) -> dict[str, dict[str, Any]]:
+def provider_health(session: Session, region: str, window: int) -> dict[str, dict[str, Any]]:
     """Compute error rate and latency for each provider in a region.
 
     Only the most recent ``window`` probes per provider are considered, so the figures
     reflect current behaviour rather than all of history.
 
     Args:
-        conn: Open database connection.
+        session: Open database session.
         region: Region to report on, e.g. ``"eu-west"``.
         window: Number of recent probes per provider.
 
@@ -42,27 +46,28 @@ def provider_health(conn: sqlite3.Connection, region: str, window: int) -> dict[
         the region is absent.
     """
     # Newest probes first, so the first ``window`` rows per provider are the latest ones.
-    rows = conn.execute(
-        "SELECT provider, status_code, ttfb_ms FROM probe WHERE region = ? "
-        "ORDER BY observed_at DESC",
-        (region,),
-    ).fetchall()
+    query = (
+        select(Probe.provider, Probe.status_code, Probe.ttfb_ms)
+        .where(Probe.region == region)
+        .order_by(Probe.observed_at.desc())
+    )
+    rows = session.execute(query).all()
 
     # Group the rows by provider, keeping at most ``window`` probes for each.
     # ``setdefault`` returns the provider's list, creating an empty one the first time.
-    samples: dict[str, list[sqlite3.Row]] = {}
+    samples: dict[str, list[Row]] = {}
     for row in rows:
-        bucket = samples.setdefault(row["provider"], [])
+        bucket = samples.setdefault(row.provider, [])
         if len(bucket) < window:
             bucket.append(row)
 
     report: dict[str, dict[str, Any]] = {}
     for provider, probes in samples.items():
         # Count the probes that failed.
-        errors = sum(1 for probe in probes if probe["status_code"] == 500)
+        errors = sum(1 for probe in probes if probe.status_code == 500)
         report[provider] = {
             "samples": len(probes),
             "error_rate": round(errors / len(probes), 4),
-            "p95_ttfb_ms": round(_p95([probe["ttfb_ms"] for probe in probes]), 1),
+            "p95_ttfb_ms": round(_p95([probe.ttfb_ms for probe in probes]), 1),
         }
     return report

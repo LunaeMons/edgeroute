@@ -1,84 +1,122 @@
-"""SQLite access helpers.
+"""Database access: the SQLAlchemy engine, sessions, and schema migrations.
 
-EdgeRoute stores its data in a single SQLite file (see ADR 0001). There are two tables:
+EdgeRoute talks to its database through SQLAlchemy, the standard Python ORM
+(object-relational mapper). Tables are described once, as Python classes (the *models*,
+in each feature's ``models.py``). Code then works with objects (``cdn.weight = 30``)
+instead of writing SQL by hand, and the same code runs on SQLite today and on
+PostgreSQL later (see ADR 0002).
 
-* ``cdn``: one row per CDN provider, with its base URL, steering weight and status.
-* ``probe``: one row per measurement taken by a probe agent: when, which CDN, from
-  which region, the HTTP status it got and how long the first byte took (TTFB).
+Three ideas to know:
 
-Endpoints get a connection through the :func:`get_conn` dependency; scripts call
-:func:`connect` directly.
+* The **engine** knows how to reach the database. There is one per database URL.
+* A **session** is a unit of work: it tracks the objects you load, add or change, and
+  writes them all in one transaction when you commit. Each HTTP request gets its own
+  session from :func:`get_session`.
+* **Migrations** (Alembic, in ``migrations/``) create and change the tables. The models
+  say what the schema should be; a migration is the script that gets an existing
+  database there without losing its data.
 """
 
-import sqlite3
 from collections.abc import Iterator
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from app.config import get_settings
 
-# ``CREATE TABLE IF NOT EXISTS`` makes the schema safe to apply on every start-up: it
-# creates missing tables and leaves existing ones, and their data, untouched.
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS cdn (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    base_url TEXT NOT NULL,
-    weight INTEGER NOT NULL DEFAULT 1,
-    enabled TEXT NOT NULL DEFAULT 'true',
-    cost_per_gb_cents INTEGER,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS probe (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    observed_at TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    region TEXT NOT NULL,
-    status_code INTEGER NOT NULL,
-    ttfb_ms REAL NOT NULL
-);
-"""
+# The project root, where alembic.ini lives.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def connect() -> sqlite3.Connection:
-    """Open a connection to the configured database.
+class Base(DeclarativeBase):
+    """Parent class of every model: it collects their tables into one schema.
 
-    ``check_same_thread=False`` lets FastAPI use the connection from the worker thread
-    that serves the request, which is not always the thread that opened it.
+    Alembic compares ``Base.metadata`` (every table the models define) with the
+    database to tell whether a migration is missing.
+    """
+
+
+def database_url() -> str:
+    """Build the SQLAlchemy URL of the configured database.
 
     Returns:
-        A connection whose rows can be read by column name, like a dictionary
-        (``row["name"]``).
+        A URL such as ``sqlite:///edgeroute.db``.
     """
-    conn = sqlite3.connect(get_settings().db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return f"sqlite:///{get_settings().db_path}"
 
 
-def init_db() -> None:
-    """Create the tables if they do not exist yet."""
-    # Used as a context manager, a connection commits when the block succeeds and
-    # rolls back if it raises.
-    with connect() as conn:
-        conn.executescript(SCHEMA)
+# One engine per database URL, created on first use and then reused, so requests share
+# a pool of open connections instead of reconnecting every time.
+_engines: dict[str, Engine] = {}
 
 
-def get_conn() -> Iterator[sqlite3.Connection]:
-    """Provide one database connection per request (a FastAPI dependency).
+def get_engine() -> Engine:
+    """Return the engine for the currently configured database.
 
-    An endpoint asks for a connection by declaring a parameter
-    ``conn: sqlite3.Connection = Depends(get_conn)``. FastAPI runs this function up to
-    the ``yield``, passes the connection to the endpoint, and runs the rest once the
-    endpoint has returned.
+    The settings are read on every call, so tests that point ``EDGEROUTE_DB_PATH`` at a
+    temporary file get an engine for that file.
+
+    Returns:
+        The engine, created on the first call for this database.
+    """
+    url = database_url()
+    if url not in _engines:
+        # SQLite ties a connection to the thread that opened it. FastAPI may serve a
+        # request on another worker thread, so allow that.
+        _engines[url] = create_engine(url, connect_args={"check_same_thread": False})
+    return _engines[url]
+
+
+def dispose_engines() -> None:
+    """Close every pooled connection and forget the engines.
+
+    Called when the application shuts down, and by tests when they finish with a
+    database.
+    """
+    for engine in _engines.values():
+        engine.dispose()
+    _engines.clear()
+
+
+def alembic_config() -> Config:
+    """Load the Alembic configuration, so migrations can be run from Python.
+
+    Returns:
+        The configuration from ``alembic.ini``, which works from any working directory.
+    """
+    return Config(str(PROJECT_ROOT / "alembic.ini"))
+
+
+def migrate() -> None:
+    """Bring the database schema up to date by applying any pending migrations.
+
+    Safe to run on every start-up: migrations that were already applied are skipped
+    (Alembic records the current revision in the ``alembic_version`` table).
+    """
+    command.upgrade(alembic_config(), "head")
+
+
+def get_session() -> Iterator[Session]:
+    """Provide one database session per request (a FastAPI dependency).
+
+    An endpoint asks for a session by declaring a parameter
+    ``session: Session = Depends(get_session)``. FastAPI runs this function up to the
+    ``yield``, passes the session to the endpoint, and runs the rest once the endpoint
+    has finished.
 
     Yields:
-        An open database connection. Changes are committed if the endpoint succeeds,
-        and the connection is always closed afterwards.
+        An open session. Its changes are committed if the endpoint succeeds and rolled
+        back if it raises; the session is always closed afterwards.
     """
-    conn = connect()
-    try:
-        yield conn
-        # Only reached when the endpoint did not raise: keep its changes.
-        conn.commit()
-    finally:
-        # Runs whether the endpoint succeeded or failed.
-        conn.close()
+    with Session(get_engine()) as session:
+        try:
+            yield session
+            # Only reached when the endpoint did not raise: save its changes.
+            session.commit()
+        except Exception:
+            # Undo everything the failed request changed, then let the error continue.
+            session.rollback()
+            raise

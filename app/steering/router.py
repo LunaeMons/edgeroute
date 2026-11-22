@@ -5,12 +5,11 @@ token) and sits on the critical path of every playback start, so it must be fast
 reliable.
 """
 
-import sqlite3
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.db import get_conn
+from app.db import get_session
 from app.steering import service
 
 router = APIRouter(prefix="/api/v1", tags=["steering"])
@@ -35,7 +34,7 @@ def steer(
     region: str = Query(..., examples=["eu-west"]),
     asset: str = Query(..., examples=["/live/nw1/master.m3u8"]),
     session_id: str | None = Query(default=None),
-    conn: sqlite3.Connection = Depends(get_conn),
+    session: Session = Depends(get_session),
 ) -> SteeringDecision:
     """Return the CDN URL a player should use for an asset.
 
@@ -44,7 +43,7 @@ def steer(
         asset: Path of the asset to play, from the ``asset`` query parameter.
         session_id: The player session, from the optional ``session_id`` query
             parameter.
-        conn: Database connection, provided by FastAPI.
+        session: Database session, provided by FastAPI.
 
     Returns:
         The chosen CDN and the full URL to fetch the asset from.
@@ -52,12 +51,12 @@ def steer(
     Raises:
         HTTPException: 503 Service Unavailable if no CDN can take the viewer.
     """
-    cdn = service.choose_cdn(conn, region=region, session_id=session_id)
+    cdn = service.choose_cdn(session, region=region, session_id=session_id)
     if cdn is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="No CDN available."
         )
     # Join the two parts with exactly one slash, whether or not the base URL ends with
     # one or the asset path starts with one.
-    url = cdn["base_url"].rstrip("/") + "/" + asset.lstrip("/")
-    return SteeringDecision(cdn=cdn["name"], url=url, region=region)
+    url = cdn.base_url.rstrip("/") + "/" + asset.lstrip("/")
+    return SteeringDecision(cdn=cdn.name, url=url, region=region)

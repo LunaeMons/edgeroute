@@ -4,13 +4,12 @@
 * ``GET /health/{region}`` reports the health of every CDN in a region (public).
 """
 
-import sqlite3
-
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.config import get_settings
-from app.db import get_conn
+from app.db import get_session
 from app.probes import health, ingest
 
 router = APIRouter(prefix="/api/v1/probes", tags=["probes"])
@@ -18,7 +17,7 @@ router = APIRouter(prefix="/api/v1/probes", tags=["probes"])
 
 @router.post("/import", dependencies=[Depends(require_admin)])
 async def import_probes(
-    file: UploadFile = File(...), conn: sqlite3.Connection = Depends(get_conn)
+    file: UploadFile = File(...), session: Session = Depends(get_session)
 ) -> dict:
     """Import a probe export (CSV or JSONL) from the probe agents (admin only).
 
@@ -27,7 +26,7 @@ async def import_probes(
 
     Args:
         file: The uploaded export, from the ``file`` form field.
-        conn: Database connection, provided by FastAPI.
+        session: Database session, provided by FastAPI.
 
     Returns:
         The import summary: counts of total, imported and rejected rows, and the
@@ -46,16 +45,16 @@ async def import_probes(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="File must be UTF-8 text."
         ) from exc
-    return ingest.process_import(conn, content, file_format)
+    return ingest.process_import(session, content, file_format)
 
 
 @router.get("/health/{region}")
-def region_health(region: str, conn: sqlite3.Connection = Depends(get_conn)) -> dict:
+def region_health(region: str, session: Session = Depends(get_session)) -> dict:
     """Show error rate and latency per CDN for a region.
 
     Args:
         region: The region to report on, from the URL path, e.g. ``eu-west``.
-        conn: Database connection, provided by FastAPI.
+        session: Database session, provided by FastAPI.
 
     Returns:
         The region, the probe window used, and the statistics for each provider.
@@ -63,5 +62,5 @@ def region_health(region: str, conn: sqlite3.Connection = Depends(get_conn)) -> 
     return {
         "region": region,
         "window": get_settings().probe_window,
-        "providers": health.provider_health(conn, region, get_settings().probe_window),
+        "providers": health.provider_health(session, region, get_settings().probe_window),
     }

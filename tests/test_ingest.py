@@ -7,12 +7,14 @@ Where raising IS the expected behaviour, the test says so with ``pytest.raises``
 """
 
 import json
-import sqlite3
 from typing import Any
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.probes import ingest
+from app.probes.models import Probe
 
 # A valid row as the probe export provides it, before validation.
 VALID_ROW = {
@@ -23,7 +25,7 @@ VALID_ROW = {
     "ttfb": "120ms",
 }
 
-# The same row after validation, keyed by the probe table's columns.
+# The same row after validation, keyed by the Probe model's fields.
 VALID_PROBE = {
     "observed_at": "2026-11-17T08:00:00",
     "provider": "aurora",
@@ -216,30 +218,29 @@ def test_validate_row_rejects_an_invalid_value(field: str, value: str) -> None:
 # --- Whole import -------------------------------------------------------------------
 
 
-def _stored_probes(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+def _stored_probes(session: Session) -> list[dict[str, Any]]:
     """Return every stored probe, in insertion order, without the generated ID.
 
     Args:
-        conn: Open database connection.
+        session: Open database session.
 
     Returns:
-        The probe rows as dictionaries.
+        The probes as dictionaries keyed by field name.
     """
-    rows = conn.execute(
-        "SELECT observed_at, provider, region, status_code, ttfb_ms FROM probe ORDER BY id"
-    ).fetchall()
-    return [dict(row) for row in rows]
+    probes = session.scalars(select(Probe).order_by(Probe.id))
+    fields = ("observed_at", "provider", "region", "status_code", "ttfb_ms")
+    return [{field: getattr(probe, field) for field in fields} for probe in probes]
 
 
 def test_process_import_stores_valid_rows_and_reports_rejected_ones(
-    conn: sqlite3.Connection,
+    session: Session,
 ) -> None:
     """Valid rows are stored; each invalid row is reported with its line number and reason.
 
     Line numbers count data rows from 1, so the header is not line 1.
 
     Args:
-        conn: Connection to a fresh database.
+        session: Session on a fresh, migrated database.
     """
     content = (
         "timestamp,cdn_name,region,status,ttfb\n"
@@ -249,7 +250,7 @@ def test_process_import_stores_valid_rows_and_reports_rejected_ones(
         "not-a-date,meridian,eu-west,200,90ms\n"
     )
 
-    summary = ingest.process_import(conn, content, "csv")
+    summary = ingest.process_import(session, content, "csv")
 
     assert summary == {
         "total": 4,
@@ -260,7 +261,7 @@ def test_process_import_stores_valid_rows_and_reports_rejected_ones(
             {"line": 4, "reason": "Missing required fields."},
         ],
     }
-    assert _stored_probes(conn) == [
+    assert _stored_probes(session) == [
         {
             "observed_at": "2026-11-17T08:00:00",
             "provider": "aurora",
@@ -278,45 +279,45 @@ def test_process_import_stores_valid_rows_and_reports_rejected_ones(
     ]
 
 
-def test_process_import_uses_the_jsonl_parser_for_jsonl(conn: sqlite3.Connection) -> None:
+def test_process_import_uses_the_jsonl_parser_for_jsonl(session: Session) -> None:
     """With ``file_format="jsonl"`` the content is read as JSON Lines.
 
     Args:
-        conn: Connection to a fresh database.
+        session: Session on a fresh, migrated database.
     """
     content = json.dumps(VALID_ROW) + "\n"
 
-    summary = ingest.process_import(conn, content, "jsonl")
+    summary = ingest.process_import(session, content, "jsonl")
 
     assert summary == {"total": 1, "imported": 1, "rejected": 0, "errors": []}
-    assert _stored_probes(conn) == [VALID_PROBE]
+    assert _stored_probes(session) == [VALID_PROBE]
 
 
-def test_process_import_of_an_empty_file_stores_nothing(conn: sqlite3.Connection) -> None:
+def test_process_import_of_an_empty_file_stores_nothing(session: Session) -> None:
     """An empty export is a valid, empty import: all counts are zero.
 
     Args:
-        conn: Connection to a fresh database.
+        session: Session on a fresh, migrated database.
     """
-    summary = ingest.process_import(conn, "", "csv")
+    summary = ingest.process_import(session, "", "csv")
 
     assert summary == {"total": 0, "imported": 0, "rejected": 0, "errors": []}
-    assert _stored_probes(conn) == []
+    assert _stored_probes(session) == []
 
 
-def test_process_import_with_only_invalid_rows_stores_nothing(conn: sqlite3.Connection) -> None:
+def test_process_import_with_only_invalid_rows_stores_nothing(session: Session) -> None:
     """When every row is invalid, every row is reported and nothing is stored.
 
     Args:
-        conn: Connection to a fresh database.
+        session: Session on a fresh, migrated database.
     """
     # Both rows lack a timestamp.
     content = (
         "timestamp,cdn_name,region,status,ttfb\n,aurora,eu-west,200,1ms\n,aurora,eu-west,200,1ms\n"
     )
 
-    summary = ingest.process_import(conn, content, "csv")
+    summary = ingest.process_import(session, content, "csv")
 
     assert (summary["total"], summary["imported"], summary["rejected"]) == (2, 0, 2)
     assert [error["line"] for error in summary["errors"]] == [1, 2]
-    assert _stored_probes(conn) == []
+    assert _stored_probes(session) == []

@@ -17,16 +17,17 @@ How the suite is organised:
   validation, authentication and status codes).
 """
 
-import sqlite3
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app import db
 from app.main import create_app
+from app.probes.models import Probe
 
 # Headers that authenticate as an admin. The value matches the token the app falls back
 # to when none is configured (see app/config.py).
@@ -40,7 +41,7 @@ InsertProbe = Callable[..., None]
 
 
 @pytest.fixture()
-def db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Point the app at an empty database file inside this test's temporary directory.
 
     Args:
@@ -49,12 +50,14 @@ def db_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         monkeypatch: Lets the test change environment variables; pytest undoes the
             changes when the test ends (built-in fixture).
 
-    Returns:
+    Yields:
         The path of the database file. It does not exist until something connects.
+        When the test ends, every pooled connection is closed.
     """
     path = tmp_path / "test.db"
     monkeypatch.setenv("EDGEROUTE_DB_PATH", str(path))
-    return path
+    yield path
+    db.dispose_engines()
 
 
 @pytest.fixture()
@@ -77,8 +80,8 @@ def client(db_path: Path) -> Iterator[TestClient]:
 
 
 @pytest.fixture()
-def conn(db_path: Path) -> Iterator[sqlite3.Connection]:
-    """Provide a connection to a fresh database with the tables already created.
+def session(db_path: Path) -> Iterator[Session]:
+    """Provide a session on a fresh database whose schema is fully migrated.
 
     Unit tests use it to call repository and service functions directly, without HTTP.
 
@@ -86,12 +89,12 @@ def conn(db_path: Path) -> Iterator[sqlite3.Connection]:
         db_path: The fresh database file (fixture above).
 
     Yields:
-        An open connection. It is closed when the test ends.
+        An open session. It is closed when the test ends; uncommitted changes are
+        discarded.
     """
-    db.init_db()
-    connection = db.connect()
-    yield connection
-    connection.close()
+    db.migrate()
+    with Session(db.get_engine()) as test_session:
+        yield test_session
 
 
 @pytest.fixture()
@@ -148,17 +151,17 @@ def make_cdn(client: TestClient, admin_headers: dict[str, str]) -> MakeCdn:
 
 
 @pytest.fixture()
-def insert_probe(conn: sqlite3.Connection) -> InsertProbe:
+def insert_probe(session: Session) -> InsertProbe:
     """Provide a function that stores one probe directly in the database.
 
     Health tests use it to set up exactly the probes they need, without going through
     the import.
 
     Args:
-        conn: Connection to the fresh database (fixture above).
+        session: Session on the fresh database (fixture above).
 
     Returns:
-        A function that inserts one probe row.
+        A function that stores one probe.
     """
 
     def _insert(
@@ -168,7 +171,7 @@ def insert_probe(conn: sqlite3.Connection) -> InsertProbe:
         ttfb_ms: float = 120.0,
         observed_at: str = "2026-11-17T08:00:00",
     ) -> None:
-        """Insert one probe row and commit it.
+        """Store one probe and commit it.
 
         Args:
             provider: CDN name.
@@ -177,11 +180,15 @@ def insert_probe(conn: sqlite3.Connection) -> InsertProbe:
             ttfb_ms: Time to first byte, in milliseconds.
             observed_at: When the probe ran, ISO 8601.
         """
-        conn.execute(
-            "INSERT INTO probe (observed_at, provider, region, status_code, ttfb_ms) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (observed_at, provider, region, status_code, ttfb_ms),
+        session.add(
+            Probe(
+                observed_at=observed_at,
+                provider=provider,
+                region=region,
+                status_code=status_code,
+                ttfb_ms=ttfb_ms,
+            )
         )
-        conn.commit()
+        session.commit()
 
     return _insert

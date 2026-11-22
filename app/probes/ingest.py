@@ -7,18 +7,21 @@ uploads their exports here. The formats are described in ``docs/vendor-feeds.md`
 The import runs in three steps:
 
 1. Parse the file into rows (:func:`parse_csv` or :func:`parse_jsonl`).
-2. Validate each row and map it to the ``probe`` table (:func:`validate_row`).
+2. Validate each row and map it to the ``Probe`` model (:func:`validate_row`).
 3. Store the valid rows and report the rejected ones (:func:`process_import`).
 """
 
 import csv
 import io
 import json
-import sqlite3
 from datetime import datetime
 from typing import Any
 
-# Columns of the ``probe`` table that every stored probe must have a value for.
+from sqlalchemy.orm import Session
+
+from app.probes.models import Probe
+
+# Fields of the ``Probe`` model that every stored probe must have a value for.
 REQUIRED_FIELDS = ("observed_at", "provider", "region", "status_code", "ttfb_ms")
 
 
@@ -123,10 +126,10 @@ def validate_row(row: dict[str, Any]) -> dict[str, Any] | None:
         row: A parsed row from a CSV or JSONL export.
 
     Returns:
-        The row ready for insertion, keyed by the ``probe`` table's column names, or
+        The row ready for insertion, keyed by the ``Probe`` model's field names, or
         None if a required field is missing or invalid.
     """
-    # Map the export's field names to the probe table's columns, cleaning each value.
+    # Map the export's field names to the Probe model's fields, cleaning each value.
     # Names are trimmed and lowercased so " Aurora " and "aurora" are the same CDN.
     transformed = {
         "observed_at": parse_timestamp(row.get("timestamp")),
@@ -141,11 +144,13 @@ def validate_row(row: dict[str, Any]) -> dict[str, Any] | None:
     return transformed
 
 
-def process_import(conn: sqlite3.Connection, content: str, file_format: str) -> dict[str, Any]:
+def process_import(session: Session, content: str, file_format: str) -> dict[str, Any]:
     """Run the import for one uploaded file.
 
+    The probes are added to the session; they are saved when the caller commits.
+
     Args:
-        conn: Open database connection.
+        session: Open database session.
         content: The file's text.
         file_format: ``"csv"`` or ``"jsonl"``.
 
@@ -162,11 +167,8 @@ def process_import(conn: sqlite3.Connection, content: str, file_format: str) -> 
         if probe is None:
             errors.append({"line": line, "reason": "Missing required fields."})
             continue
-        # Named placeholders (``:observed_at``) are filled from the dictionary's keys.
-        conn.execute(
-            "INSERT INTO probe (observed_at, provider, region, status_code, ttfb_ms) "
-            "VALUES (:observed_at, :provider, :region, :status_code, :ttfb_ms)",
-            probe,
-        )
+        # ``**probe`` passes the dictionary's keys as keyword arguments:
+        # Probe(observed_at=..., provider=..., ...).
+        session.add(Probe(**probe))
         imported += 1
     return {"total": len(rows), "imported": imported, "rejected": len(errors), "errors": errors}
