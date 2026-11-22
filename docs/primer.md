@@ -110,5 +110,8 @@ Read: [MDN: CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS)
 - **Watch for an agent "fixing" a failing test by changing the test.** Sometimes the test is
   wrong. Make sure you know which one it is.
 - **Keep the agent's changes small**, one ticket and one concern at a time, so they stay reviewable.
+- **Hold its code to the team's standard.** Agents write code fast, so readability is what keeps
+  you in control of it. Ask for docstrings and comments that follow CONTRIBUTING, then read
+  them. A docstring that doesn't match the code means either the docstring or the code is wrong.
 
 Read: [Claude Code best practices](https://www.anthropic.com/engineering/claude-code-best-practices)

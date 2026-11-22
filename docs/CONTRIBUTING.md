@@ -38,6 +38,45 @@ NWM-101 ci: run tests on pull requests into main
 The format is enforced by the `commit-msg` hook (see `scripts/check-commit-msg.sh` for the exact
 rules).
 
+## Code style: docstrings and comments
+
+Code is read far more often than it is written, often by someone new to the codebase. Write
+for that reader.
+
+- **Every module, class and function has a docstring**, in the
+  [Google style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
+  That includes tests, fixtures and private helpers.
+  - A one-line summary in the imperative ("Return ...", "Reject ..."), ending with a full stop.
+  - `Args:`, `Returns:` (or `Yields:`) and `Raises:` sections whenever they apply.
+  - A class lists its fields under `Attributes:`.
+  - A test's docstring states the behaviour it protects, in plain words: "A disabled CDN never
+    receives a viewer", not "test disabled".
+- **Comments explain why, not what.** `# Newest first, so the first rows are the latest probes`
+  helps. `# loop over rows` does not. Explain anything a newcomer would have to look up.
+- **Docstrings stay true.** When you change what a function does, update its docstring in the
+  same commit. A docstring that describes the old behaviour is worse than none.
+- The linter enforces the docstring rules (`D` in `pyproject.toml`, Google convention), so
+  `make lint` fails on a missing or malformed docstring.
+
+Example:
+
+```python
+def provider_health(conn: sqlite3.Connection, region: str, window: int) -> dict[str, dict]:
+    """Compute error rate and latency for each provider in a region.
+
+    Args:
+        conn: Open database connection.
+        region: Region to report on, e.g. ``"eu-west"``.
+        window: Number of recent probes per provider.
+
+    Returns:
+        A mapping of provider name to its statistics.
+    """
+```
+
+FastAPI shows an endpoint's docstring as its description at `/docs`, so write endpoint docstrings
+for the people who call the API too.
+
 ## Before you push
 
 ```bash

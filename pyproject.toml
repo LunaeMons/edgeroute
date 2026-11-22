@@ -19,15 +19,24 @@ dev = [
     "ruff>=0.6",
 ]
 
+# Ruff is the linter and formatter: https://docs.astral.sh/ruff/
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "S"]
+# E/F: errors and pyflakes, I: import order, B: likely bugs, UP: modern syntax,
+# S: security (bandit), D: docstrings (pydocstyle).
+select = ["E", "F", "I", "B", "UP", "S", "D"]
+# S101 flags every `assert`; pytest relies on them.
 ignore = ["S101"]
 
+[tool.ruff.lint.pydocstyle]
+# Every module, class and function has a Google-style docstring (see docs/CONTRIBUTING.md).
+convention = "google"
+
 [tool.ruff.lint.per-file-ignores]
+# Security rules are for application code; test code is never deployed.
 "tests/*" = ["S"]
 
 [tool.pytest.ini_options]
