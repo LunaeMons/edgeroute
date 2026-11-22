@@ -6,27 +6,13 @@ reliable.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.steering import service
+from app.steering.schemas import SteeringDecision
 
 router = APIRouter(prefix="/api/v1", tags=["steering"])
-
-
-class SteeringDecision(BaseModel):
-    """Where the player should fetch the asset from.
-
-    Attributes:
-        cdn: Name of the chosen CDN provider.
-        url: Full URL of the asset on that CDN.
-        region: The viewer's region, echoed back from the request.
-    """
-
-    cdn: str
-    url: str
-    region: str
 
 
 @router.get("/steer", response_model=SteeringDecision)

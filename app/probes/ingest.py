@@ -51,6 +51,9 @@ def parse_jsonl(content: str) -> list[dict[str, Any]]:
     Returns:
         One dictionary per non-empty line, with JSON types preserved (numbers stay
         numbers).
+
+    Raises:
+        json.JSONDecodeError: If a non-empty line is not valid JSON.
     """
     return [json.loads(line) for line in content.splitlines() if line.strip()]
 

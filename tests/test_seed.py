@@ -74,6 +74,8 @@ def test_seed_runs_as_a_command(db_path: Path) -> None:
         capture_output=True,
         text=True,
         env=os.environ | {"EDGEROUTE_DB_PATH": str(db_path)},
+        # Run from the project root, as `make seed` does, wherever pytest was started.
+        cwd=seed.DATA.parent.parent,
         check=False,
     )
 

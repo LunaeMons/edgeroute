@@ -5,7 +5,7 @@ description = "Multi-CDN steering service for Northwind Media."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alembic>=1.13",
+    "alembic>=1.16",
     "fastapi>=0.115",
     "pydantic>=2.7",
     "python-multipart>=0.0.9",

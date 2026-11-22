@@ -64,7 +64,15 @@ def test_create_applies_the_defaults(client: TestClient, admin_headers: dict[str
 
     assert response.status_code == 201
     body = response.json()
-    assert (body["weight"], body["enabled"], body["cost_per_gb_cents"]) == (1, True, None)
+    del body["created_at"]
+    assert body == {
+        "id": 1,
+        "name": "aurora",
+        "base_url": "https://cdn.example/",
+        "weight": 1,
+        "enabled": True,
+        "cost_per_gb_cents": None,
+    }
 
 
 @pytest.mark.parametrize("weight", [0, 100])
@@ -306,7 +314,8 @@ def test_disabled_cdn_can_be_enabled_again(
     )
 
     assert response.status_code == 200
-    assert response.json()["enabled"] is True
+    assert response.json() == created | {"enabled": True}
+    assert client.get(f"/api/v1/cdns/{created['id']}").json() == created | {"enabled": True}
 
 
 def test_update_with_an_empty_body_changes_nothing(
@@ -344,7 +353,8 @@ def test_update_cannot_rename_a_cdn(
     )
 
     assert response.status_code == 200
-    assert response.json()["name"] == "kestrel"
+    assert response.json() == created
+    assert client.get(f"/api/v1/cdns/{created['id']}").json() == created
 
 
 @pytest.mark.parametrize(
@@ -455,3 +465,6 @@ def test_a_deleted_name_can_be_registered_again(
     )
 
     assert response.status_code == 201
+    assert response.json()["name"] == "meridian"
+    assert response.json()["base_url"] == "https://m.example/"
+    assert [cdn["name"] for cdn in client.get("/api/v1/cdns").json()] == ["meridian"]

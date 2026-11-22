@@ -45,6 +45,9 @@ def get_settings() -> Settings:
 
     Returns:
         The resolved settings.
+
+    Raises:
+        ValueError: If ``EDGEROUTE_PROBE_WINDOW`` is not a whole number.
     """
     # Each setting falls back to a default that is convenient for local development.
     return Settings(

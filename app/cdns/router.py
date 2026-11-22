@@ -80,9 +80,7 @@ def create_cdn(payload: CdnCreate, session: Session = Depends(get_session)) -> C
 
 
 @router.patch("/{cdn_id}", response_model=CdnRead, dependencies=[Depends(require_admin)])
-def update_cdn(
-    cdn_id: int, payload: CdnUpdate, session: Session = Depends(get_session)
-) -> Cdn:
+def update_cdn(cdn_id: int, payload: CdnUpdate, session: Session = Depends(get_session)) -> Cdn:
     """Change some fields of a CDN provider (admin only).
 
     Args:

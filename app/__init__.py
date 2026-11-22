@@ -1,8 +1,9 @@
 """EdgeRoute: the multi-CDN steering service for Northwind Media.
 
 The package is organised by feature. Each feature folder holds its HTTP endpoints
-(``router.py``), its database access (``repository.py``) or business logic
-(``service.py``), and its request and response models (``schemas.py``):
+(``router.py``) and its logic. Depending on what the feature needs, it also has
+request and response models (``schemas.py``), database tables (``models.py``) and
+database access (``repository.py``):
 
 * ``app.cdns``: register and manage the CDN providers.
 * ``app.steering``: decide which CDN a video player should use.
