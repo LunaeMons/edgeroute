@@ -13,7 +13,7 @@ migrate:
 
 # Start the API with auto-reload: the server restarts when a file changes.
 run:
-	uv run uvicorn app.main:app --reload --port 8000
+	uv run uvicorn app.main:app --reload --port 8080
 
 # Load the CDN providers in data/cdns.json into the local database.
 seed:
