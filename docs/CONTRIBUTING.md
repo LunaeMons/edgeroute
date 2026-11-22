@@ -30,7 +30,7 @@ should know. Wrap at 72 characters.
 Examples:
 
 ```
-NWM-102 fix(probes): read the provider from the cdn column
+NWM-107 feat(console): show each CDN's weight and status
 NWM-102 test(probes): cover JSONL imports and duplicate probes
 NWM-101 ci: run tests on pull requests into main
 ```
@@ -49,8 +49,8 @@ for that reader.
   - A one-line summary in the imperative ("Return ...", "Reject ..."), ending with a full stop.
   - `Args:`, `Returns:` (or `Yields:`) and `Raises:` sections whenever they apply.
   - A class lists its fields under `Attributes:`.
-  - A test's docstring states the behaviour it protects, in plain words: "A disabled CDN never
-    receives a viewer", not "test disabled".
+  - A test's docstring states the behaviour it protects, in plain words: "Deleting a CDN twice
+    returns 404 the second time", not "test delete".
 - **Comments explain why, not what.** `# Newest first, so the first rows are the latest probes`
   helps. `# loop over rows` does not. Explain anything a newcomer would have to look up.
 - **Docstrings stay true.** When you change what a function does, update its docstring in the
@@ -61,11 +61,11 @@ for that reader.
 Example:
 
 ```python
-def provider_health(conn: sqlite3.Connection, region: str, window: int) -> dict[str, dict]:
+def provider_health(session: Session, region: str, window: int) -> dict[str, dict]:
     """Compute error rate and latency for each provider in a region.
 
     Args:
-        conn: Open database connection.
+        session: Open database session.
         region: Region to report on, e.g. ``"eu-west"``.
         window: Number of recent probes per provider.
 
@@ -88,7 +88,7 @@ changed only through Alembic migrations (`migrations/versions/`). See ADR 0002.
   is a draft, not a decision:
 
   ```bash
-  uv run alembic revision --autogenerate --rev-id 0002 -m "add probe_id to probe"
+  uv run alembic revision --autogenerate --rev-id 0002 -m "add notes to cdn"
   make migrate
   ```
 
@@ -155,7 +155,7 @@ pre-commit run --all-files
 ## Configuration and secrets
 
 - All configuration comes from environment variables prefixed `EDGEROUTE_`, documented in the
-  README.
+  [quickstart](quickstart.md#environment-variables).
 - Never commit secrets, tokens, local databases or generated files.
 
 ## Decisions

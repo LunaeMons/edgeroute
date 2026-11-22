@@ -12,7 +12,7 @@ showed up as the code grew:
 - SQL strings were spread across modules, and every new query was another chance to build SQL by
   formatting strings, which invites SQL injection.
 - The schema was a `CREATE TABLE IF NOT EXISTS` script run at start-up. It can create tables but
-  never change them, so any column added later (for example a probe ID) would need hand-written,
+  never change them, so any column added later would need hand-written,
   untracked `ALTER TABLE` statements on every environment.
 - Moving to PostgreSQL (see NWM-106) would mean rewriting every query.
 

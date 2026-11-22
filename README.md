@@ -54,9 +54,10 @@ ingestion. They have since moved to another team. These tickets are now yours:
   the service can actually serve (for example, whether the database is reachable). Add a release
   workflow: pushing a tag like `v1.2.3` builds the container image and publishes it to the GitHub
   Container Registry, tagged with that version. Finish by releasing `v0.1.0`.
-- **NWM-105: Code review.** Inês opened PR #1 just before going on leave. Review it the way you
-  would review a teammate's work: leave a GitHub review with comments on specific lines, then
-  approve or request changes. Decide what should happen to the PR, and say why in the review.
+- **NWM-105: Code review.** Inês opened PR #1 just before going on leave (GitHub shows it as
+  opened from the team account; the commits are hers). Review it the way you would review a
+  teammate's work: leave a GitHub review with comments on specific lines, then approve or
+  request changes. Decide what should happen to the PR, and say why in the review.
   PR #1 lives in the original repository (`LunaeMons/edgeroute`), not in your fork: review it
   there.
 - **NWM-106: Scaling note.** Northwind wants EdgeRoute in front of every playback start. At a big

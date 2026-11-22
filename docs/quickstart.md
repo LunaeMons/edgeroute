@@ -4,6 +4,7 @@
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (it installs the right Python for you)
 - Git
+- `make` (preinstalled on macOS and Linux; on Windows, work inside WSL)
 - Docker, for the container setup (optional for local development)
 
 ## Run it locally

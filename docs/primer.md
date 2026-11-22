@@ -8,7 +8,7 @@ section ends with something to read if you want to go deeper.
 
 - **A commit is one logical change**, with a message that says why. Six months from now,
   `git log` and `git blame` are how someone (often you) finds out why a line exists. "fix stuff"
-  tells them nothing. `NWM-102 fix(probes): treat status 0 as a timeout` tells them everything.
+  tells them nothing. `NWM-104 build(docker): run the API as a non-root user` tells them everything.
 - **A branch per change** keeps unfinished work away from `main`, so `main` stays releasable.
 - **A pull request (PR)** is where a change is proposed, explained, checked by CI and reviewed
   before it joins `main`. Its description is a short design note: what, why, how it was tested,

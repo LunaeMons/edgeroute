@@ -25,9 +25,13 @@ flowchart LR
 | `app/steering/` | Picks a CDN for a viewer by weighted random choice |
 | `app/probes/` | Imports probe exports, computes health statistics per CDN and region |
 
-Each feature folder follows the same layout: `router.py` (HTTP endpoints), `schemas.py` (the API
-contract, pydantic), `models.py` (database tables, SQLAlchemy), and `repository.py` or
-`service.py` (database access and logic).
+Each feature folder has a `router.py` (HTTP endpoints) and its logic, plus what the feature needs:
+
+| Feature | Files |
+|---|---|
+| `app/cdns/` | `router.py`, `schemas.py` (API contract), `models.py` (table), `repository.py` (database access) |
+| `app/steering/` | `router.py`, `schemas.py`, `service.py` (the steering decision) |
+| `app/probes/` | `router.py`, `models.py`, `ingest.py` (import), `health.py` (statistics) |
 
 ## Data model
 

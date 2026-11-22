@@ -1,6 +1,7 @@
 # 0001. SQLite for the first iteration
 
-- **Status:** Accepted
+- **Status:** Accepted. The data-access part (plain SQL) is superseded by
+  [ADR 0002](0002-sqlalchemy-orm-and-alembic-migrations.md); SQLite itself still stands.
 - **Date:** 2026-11-03
 - **Ticket:** NWM-090
 
