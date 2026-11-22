@@ -57,6 +57,8 @@ ingestion. They have since moved to another team. These tickets are now yours:
 - **NWM-105: Code review.** Inês opened PR #1 just before going on leave. Review it the way you
   would review a teammate's work: leave a GitHub review with comments on specific lines, then
   approve or request changes. Decide what should happen to the PR, and say why in the review.
+  PR #1 lives in the original repository (`LunaeMons/edgeroute`), not in your fork: review it
+  there.
 - **NWM-106: Scaling note.** Northwind wants EdgeRoute in front of every playback start. At a big
   football final that is 50,000 steering requests per second, across 20 regions, with 500 probe
   agents reporting. Write `docs/design/scaling.md` (one or two pages, diagrams welcome): what
@@ -81,6 +83,30 @@ ingestion. They have since moved to another team. These tickets are now yours:
 > **TIP** Include the ticket number in your branch names, commit messages and PR titles.
 
 ## Getting started
+
+### 1. Fork the repository
+
+You work in your own copy of this repository, a **fork**, and that is also how you hand the work
+in. You'll need a free [GitHub account](https://github.com/signup).
+
+1. Click **Fork** at the top of this page and create the fork under your account (keeping only
+   the `main` branch is fine). Everything else in this README, including "push", "pull request",
+   "CI" and "`main`", refers to **your fork** from here on.
+2. Clone your fork, not this repository: `git clone https://github.com/<you>/edgeroute.git`.
+3. Turn on the features that GitHub switches off for forks:
+   - **Actions** tab → *I understand my workflows, go ahead and enable them*. Without this, no
+     pipeline will ever run.
+   - **Settings → General → Features → Issues**, so you can track work and record decisions.
+4. Point the GitHub CLI at your fork, if you use it: `gh repo set-default <you>/edgeroute`.
+
+> **TIP** When you open a pull request in a fork, GitHub proposes the *original* repository as the
+> base. Change **base repository** to `<you>/edgeroute` every time. Your pull requests go into
+> your own `main`, never into `LunaeMons/edgeroute`.
+
+You own your fork, so you hold the admin rights the tickets need (for example, the branch rules in
+NWM-101).
+
+### 2. Run it
 
 Read the [contributing guide](docs/CONTRIBUTING.md) first: it describes how this team works with
 Git and pull requests. Then follow the [quickstart](docs/quickstart.md) to run the project. In
@@ -111,19 +137,30 @@ pull requests, CI and CD, with links for further reading.
   what you checked, and what you changed or rejected, and why. A few lines per ticket is enough.
 
 Tickets are written by people. They can be incomplete or contradict each other, as in any real
-team. When something is unclear, open a GitHub issue to ask, or make a decision and write down why.
+team. When something is unclear, ask us in an issue on the original repository
+([LunaeMons/edgeroute](https://github.com/LunaeMons/edgeroute/issues)), or make a decision and
+write down why (an issue in your fork, an ADR or the PR description).
 
 ## How to work in this repo
 
-- One branch and one pull request per ticket. Never push directly to `main`.
+- One branch and one pull request per ticket, inside your fork. Never push directly to `main`.
 - CI must be green before you merge. There is no reviewer on call, so you merge your own PRs, but
   write each PR as if someone will review it tomorrow.
 - Small, meaningful commits. Your Git history is part of what we review.
 
 ## Submitting your work
 
-When you're done, release `v0.1.0` (NWM-104) and open an issue titled **Submission** with a short
-note: what you did, what you didn't get to, and what you would do next.
+All your work stays in your fork. When you're done:
+
+1. Release `v0.1.0` from your fork (NWM-104), and make the container package public (**Packages**
+   → the package → **Package settings** → *Change visibility*) so we can pull the image.
+2. Open an issue titled **Submission** on the
+   [original repository](https://github.com/LunaeMons/edgeroute/issues) with:
+   - the link to your fork;
+   - a short note: what you did, what you didn't get to, and what you would do next.
+
+Don't open pull requests against the original repository: we review your fork as it is, including
+its history, pull requests, CI runs and issues.
 
 There's no deadline. Most people need three or four focused evenings. If you don't finish
 everything, that's fine: tell us what you would have done.
@@ -134,5 +171,5 @@ everything, that's fine: tell us what you would have done.
 
 ## Copyright
 
-Private training material, shared by invitation. Please don't publish or redistribute it. See
-[LICENSE](LICENSE).
+Training material. You may fork it to do the exercise. Please don't copy or redistribute it for
+anything else. See [LICENSE](LICENSE).

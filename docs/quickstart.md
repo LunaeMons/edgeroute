@@ -9,7 +9,7 @@
 ## Run it locally
 
 ```bash
-git clone <this repo>
+git clone https://github.com/<you>/edgeroute.git   # your fork, see the README
 cd edgeroute
 make install                                  # creates .venv and installs dependencies
 export EDGEROUTE_ADMIN_TOKEN=pick-a-local-secret
