@@ -77,6 +77,33 @@ def provider_health(conn: sqlite3.Connection, region: str, window: int) -> dict[
 FastAPI shows an endpoint's docstring as its description at `/docs`, so write endpoint docstrings
 for the people who call the API too.
 
+## Tests
+
+Every change comes with tests, written to the same standard as the existing suite in `tests/`.
+
+- **One behaviour per test**, named and described as that behaviour:
+  `test_delete_twice_returns_404_the_second_time`.
+- **Test the failure paths, not only the happy path.** For each endpoint or function: invalid
+  input, missing input, the edges of every range (0, 100, 101), not found, duplicates, empty
+  data, and what happens when a dependency fails.
+- **Assert everything that matters.** Check the status code *and* the whole body
+  (`assert response.json() == {...}`), not just that a body exists. After a write, check the
+  stored state too (fetch it again), so the test proves the change was saved and not only
+  echoed back. After a rejected request, check that nothing changed.
+- **Expected errors are asserted explicitly** with `pytest.raises(...)`. Any other exception
+  fails the test on its own, so "returns None for garbage" also proves nothing was raised.
+- **Use `pytest.mark.parametrize`** to run one test over many inputs, rather than copying it or
+  looping inside it. Each case then passes or fails on its own, with a readable ID.
+- **Deterministic, always.** No test may depend on luck, timing or the order tests run in. Set up
+  a case with only one right answer, or replace the source of randomness with `monkeypatch`.
+  A test that "sometimes fails" is a bug in the test or the code. Find out which: never skip it.
+- **Unit tests** call one module's functions directly (`test_ingest.py`). **API tests** send
+  HTTP requests through `TestClient` (`test_cdns.py`). Write both: unit tests pin down the
+  logic, API tests prove the pieces are wired together.
+- **A test must be able to fail.** Before trusting a new test, break the code it covers (flip a
+  condition, delete a line) and watch the test go red. If it stays green, it isn't testing
+  anything.
+
 ## Before you push
 
 ```bash
