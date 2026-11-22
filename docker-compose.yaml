@@ -1,6 +1,10 @@
+# Runs the API in a container: `docker compose up --build`.
 services:
   api:
+    # Build the image from the Dockerfile in this folder.
     build: .
+    # Map port 8000 on your machine to port 8000 in the container.
     ports:
       - "8000:8000"
+    # Load environment variables (configuration and secrets) from the .env file.
     env_file: .env

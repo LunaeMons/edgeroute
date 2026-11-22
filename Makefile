@@ -1,13 +1,20 @@
+# Shortcuts for everyday tasks. Run `make <target>`, for example `make test`.
+# Each target runs inside the project's virtual environment through `uv run`.
+
 .PHONY: install run seed test
 
+# Create .venv and install the dependencies pinned in uv.lock.
 install:
 	uv sync
 
+# Start the API with auto-reload: the server restarts when a file changes.
 run:
 	uv run uvicorn app.main:app --reload --port 8000
 
+# Load the CDN providers in data/cdns.json into the local database.
 seed:
 	uv run python -m scripts.seed
 
+# Run the test suite.
 test:
 	uv run pytest

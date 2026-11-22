@@ -1,4 +1,16 @@
-"""Ingestion of CDN probe exports (partial implementation, see NWM-102)."""
+"""Ingestion of CDN probe exports (partial implementation, see NWM-102).
+
+Probe agents in each region regularly request a test object from every CDN and record
+what happened: the HTTP status and the time to first byte (TTFB). The operations team
+uploads their exports here. The formats are described in ``docs/vendor-feeds.md``.
+
+The import runs in three steps:
+
+1. Parse the file into rows (:func:`parse_csv` or :func:`parse_jsonl`).
+2. Validate each row and map it to the ``probe`` table (:func:`validate_row`).
+3. Store the valid rows and report the rejected ones (:func:`process_import`).
+"""
+
 import csv
 import io
 import json
@@ -6,6 +18,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
+# Columns of the ``probe`` table that every stored probe must have a value for.
 REQUIRED_FIELDS = ("observed_at", "provider", "region", "status_code", "ttfb_ms")
 
 
@@ -16,19 +29,25 @@ def parse_csv(content: str) -> list[dict[str, Any]]:
         content: Raw CSV text, header row first.
 
     Returns:
-        One dictionary per data row.
+        One dictionary per data row, keyed by the header names. Every value is a
+        string, because CSV has no types.
     """
+    # ``DictReader`` expects a file; ``StringIO`` wraps the text so it behaves like one.
     return list(csv.DictReader(io.StringIO(content)))
 
 
 def parse_jsonl(content: str) -> list[dict[str, Any]]:
     """Parse a JSON Lines export into row dictionaries.
 
+    JSON Lines is one complete JSON object per line, which lets an agent append to a
+    file without rewriting it.
+
     Args:
         content: Raw JSONL text, one JSON object per line.
 
     Returns:
-        One dictionary per non-empty line.
+        One dictionary per non-empty line, with JSON types preserved (numbers stay
+        numbers).
     """
     return [json.loads(line) for line in content.splitlines() if line.strip()]
 
@@ -36,18 +55,26 @@ def parse_jsonl(content: str) -> list[dict[str, Any]]:
 def normalise_ttfb(raw: Any) -> float | None:
     """Convert a time-to-first-byte value to milliseconds.
 
-    Accepts "143ms", "143", 143 or 143.0.
+    Accepts ``"143ms"``, ``"143"``, ``143`` or ``143.0``.
 
     Args:
         raw: The raw value from the export.
 
     Returns:
         The TTFB in milliseconds, or None if it cannot be parsed.
+
+    Examples:
+        >>> normalise_ttfb("143ms")
+        143.0
+        >>> normalise_ttfb("n/a") is None
+        True
     """
     if raw is None or raw == "":
         return None
+    # Numbers (from JSON) need no parsing.
     if isinstance(raw, int | float):
         return float(raw)
+    # Text (from CSV): drop an optional "ms" suffix, then parse what is left.
     text = str(raw).strip().lower()
     if text.endswith("ms"):
         text = text[:-2]
@@ -61,10 +88,10 @@ def parse_timestamp(raw: Any) -> str | None:
     """Parse an ISO 8601 timestamp.
 
     Args:
-        raw: The raw timestamp text.
+        raw: The raw timestamp text, e.g. ``"2026-11-17T08:00:11"``.
 
     Returns:
-        The timestamp in ISO format, or None if it cannot be parsed.
+        The timestamp in ISO format, or None if it is empty or cannot be parsed.
     """
     if not raw:
         return None
@@ -75,6 +102,14 @@ def parse_timestamp(raw: Any) -> str | None:
 
 
 def _to_int(raw: Any) -> int | None:
+    """Convert a value to an integer, without raising.
+
+    Args:
+        raw: The raw value, e.g. ``"200"`` or ``200``.
+
+    Returns:
+        The integer, or None if the value is missing or not a whole number.
+    """
     try:
         return int(raw)
     except (TypeError, ValueError):
@@ -88,8 +123,11 @@ def validate_row(row: dict[str, Any]) -> dict[str, Any] | None:
         row: A parsed row from a CSV or JSONL export.
 
     Returns:
-        The row ready for insertion, or None if a required field is missing.
+        The row ready for insertion, keyed by the ``probe`` table's column names, or
+        None if a required field is missing or invalid.
     """
+    # Map the export's field names to the probe table's columns, cleaning each value.
+    # Names are trimmed and lowercased so " Aurora " and "aurora" are the same CDN.
     transformed = {
         "observed_at": parse_timestamp(row.get("timestamp")),
         "provider": (row.get("cdn_name") or "").strip().lower() or None,
@@ -97,6 +135,7 @@ def validate_row(row: dict[str, Any]) -> dict[str, Any] | None:
         "status_code": _to_int(row.get("status")),
         "ttfb_ms": normalise_ttfb(row.get("ttfb")),
     }
+    # Reject the row if any required value is missing.
     if not all(transformed[field] for field in REQUIRED_FIELDS):
         return None
     return transformed
@@ -108,19 +147,22 @@ def process_import(conn: sqlite3.Connection, content: str, file_format: str) -> 
     Args:
         conn: Open database connection.
         content: The file's text.
-        file_format: "csv" or "jsonl".
+        file_format: ``"csv"`` or ``"jsonl"``.
 
     Returns:
-        A summary with counts and the rows that were rejected.
+        A summary with ``total``, ``imported`` and ``rejected`` counts, and ``errors``:
+        one entry per rejected row with its line number and the reason.
     """
     rows = parse_jsonl(content) if file_format == "jsonl" else parse_csv(content)
     imported = 0
     errors: list[dict[str, Any]] = []
+    # ``enumerate(..., start=1)`` numbers the rows from 1, as a person would count them.
     for line, row in enumerate(rows, start=1):
         probe = validate_row(row)
         if probe is None:
             errors.append({"line": line, "reason": "Missing required fields."})
             continue
+        # Named placeholders (``:observed_at``) are filled from the dictionary's keys.
         conn.execute(
             "INSERT INTO probe (observed_at, provider, region, status_code, ttfb_ms) "
             "VALUES (:observed_at, :provider, :region, :status_code, :ttfb_ms)",

@@ -1,10 +1,15 @@
+# Checks that run on your machine before each commit, so problems are fixed before they
+# reach CI. Set up once with:
+#   pre-commit install --hook-type pre-commit --hook-type commit-msg
 repos:
+  # Lint and format the Python code.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
       - id: ruff
       - id: ruff-format
 
+  # Check that the commit message follows docs/CONTRIBUTING.md.
   - repo: local
     hooks:
       - id: commit-msg-format

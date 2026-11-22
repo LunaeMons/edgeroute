@@ -1,5 +1,9 @@
+# Continuous integration: GitHub runs these checks on a clean machine, so problems are
+# caught before they reach everyone else. Runs are listed under the repository's
+# Actions tab.
 name: CI
 
+# When the workflow runs.
 on:
   push:
     branches: [master]
@@ -8,6 +12,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # Fetch the repository's code onto the runner.
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -17,6 +22,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Static checks: style, likely bugs, security and docstrings (rules in pyproject.toml).
       - name: Lint
         run: ruff check .
         continue-on-error: true
